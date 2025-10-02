@@ -11,7 +11,7 @@ trait IERC20<TContractState> {
     fn transfer(ref self: TContractState, recipient: ContractAddress, amount: u256) -> bool;
 }
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Copy, Serde, starknet::Store)]
 #[allow(starknet::store_no_default_variant)]
 enum TradeStatus {
     Created,
@@ -23,7 +23,8 @@ enum TradeStatus {
     Cancelled,
 }
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Copy, Serde, starknet::Store)]
+#[allow(starknet::store_no_default_variant)]
 enum InspectionStatus {
     Pending,
     Passed,
@@ -31,7 +32,7 @@ enum InspectionStatus {
     NotRequired,
 }
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Copy, Serde, starknet::Store)]
 struct Trade {
     id: u256,
     buyer: ContractAddress,
@@ -50,7 +51,7 @@ struct Trade {
     inspector: ContractAddress,
 }
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Copy, Serde, starknet::Store)]
 struct UserProfile {
     bvn: felt252,
     is_verified: bool,
@@ -106,7 +107,7 @@ mod PaySlab {
     };
     use core::num::traits::Zero;
     use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, Map
+        StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry
     };
 
     #[storage]
@@ -153,7 +154,7 @@ mod PaySlab {
         amount: u256,
     }
 
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Copy, starknet::Event)]
     struct TradeFunded {
         #[key]
         trade_id: u256,
@@ -202,14 +203,14 @@ mod PaySlab {
         milestone: ByteArray,
     }
 
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Copy, starknet::Event)]
     struct UserVerified {
         #[key]
         user: ContractAddress,
         bvn: felt252,
     }
 
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Copy, starknet::Event)]
     struct QualityInspectionCompleted {
         #[key]
         trade_id: u256,
@@ -263,7 +264,7 @@ mod PaySlab {
     impl PaySlabImpl of super::IPaySlab<ContractState> {
         fn verify_user(ref self: ContractState, bvn: felt252) {
             let caller = get_caller_address();
-            assert(self.all_bvns.entry(caller).read() == 0_u8, Errors::BVN_ALREADY_USED);
+            assert(self.used_bvns.entry(bvn).read() == 0_u8, Errors::BVN_ALREADY_USED);
             self.used_bvns.entry(bvn).write(1_u8);
 
             let profile = UserProfile {
@@ -275,7 +276,7 @@ mod PaySlab {
                 joined_at: get_block_timestamp(),
             };
 
-            self.user_profiles.write(caller, profile);
+            self.user_profiles.entry(caller).write(profile);
             self.emit(UserVerified { user: caller, bvn });
         }
 
@@ -288,8 +289,8 @@ mod PaySlab {
             quality_inspection_required: bool
         ) -> u256 {
             let caller = get_caller_address();
-            let buyer_profile = self.user_profiles.read(caller);
-            let seller_profile = self.user_profiles.read(seller);
+            let buyer_profile = self.user_profiles.entry(caller).read();
+            let seller_profile = self.user_profiles.entry(seller).read();
 
             assert(buyer_profile.is_verified, Errors::USER_NOT_VERIFIED);
             assert(seller_profile.is_verified, Errors::USER_NOT_VERIFIED);
@@ -326,7 +327,7 @@ mod PaySlab {
                 inspector: Zero::zero(),
             };
 
-            self.trades.write(trade_id, trade);
+            self.trades.entry(trade_id).write(trade);
             self.emit(TradeCreated { trade_id, buyer: caller, seller, amount: total_amount });
 
             trade_id
@@ -337,7 +338,7 @@ mod PaySlab {
             self._set_reentrancy(true);
 
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
             assert(trade.buyer == caller, Errors::UNAUTHORIZED_ACCESS);
@@ -366,26 +367,26 @@ mod PaySlab {
             assert(usdc.transfer(self.fee_collector.read(), fee), Errors::TRANSFER_FAILED);
 
             // Update user stats
-            let mut buyer_profile = self.user_profiles.read(caller);
+            let mut buyer_profile = self.user_profiles.entry(caller).read();
             buyer_profile = UserProfile { 
                 total_trades: buyer_profile.total_trades + u256{ low: 1, high: 0 }, 
                 ..buyer_profile 
             };
-            self.user_profiles.write(caller, buyer_profile);
+            self.user_profiles.entry(caller).write(buyer_profile);
 
-            let mut seller_profile = self.user_profiles.read(trade.seller);
+            let mut seller_profile = self.user_profiles.entry(trade.seller).read();
             seller_profile = UserProfile { 
                 total_trades: seller_profile.total_trades + u256{ low: 1, high: 0 }, 
                 ..seller_profile 
             };
-            self.user_profiles.write(trade.seller, seller_profile);
+            self.user_profiles.entry(trade.seller).write(seller_profile);
 
-            self.trades.write(trade_id, trade);
+            self.trades.entry(trade_id).write(trade);
 
-            self.emit(TradeFunded { trade_id, amount: trade.total_amount });
+            self.emit(TradeFunded { trade_id, amount: trade.total_amount.clone() });
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller, 
+                recipient: trade.seller,
                 amount: payment, 
                 milestone: "DEPOSIT" 
             });
@@ -395,7 +396,7 @@ mod PaySlab {
 
         fn mark_shipped(ref self: ContractState, trade_id: u256, tracking_number: ByteArray) {
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
             assert(trade.seller == caller, Errors::UNAUTHORIZED_ACCESS);
@@ -415,12 +416,12 @@ mod PaySlab {
             assert(usdc.transfer(trade.seller, payment), Errors::TRANSFER_FAILED);
             assert(usdc.transfer(self.fee_collector.read(), fee), Errors::TRANSFER_FAILED);
 
-            self.trades.write(trade_id, trade);
+            self.trades.entry(trade_id).write(trade);
 
             self.emit(TradeShipped { trade_id, tracking_number });
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller, 
+                recipient: trade.seller.clone(), 
                 amount: payment, 
                 milestone: "SHIPMENT" 
             });
@@ -428,7 +429,7 @@ mod PaySlab {
 
         fn confirm_delivery(ref self: ContractState, trade_id: u256) {
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
             assert(
@@ -441,7 +442,7 @@ mod PaySlab {
             }
 
             trade = Trade { status: TradeStatus::Delivered, ..trade };
-            self.trades.write(trade_id, trade.clone());
+            self.trades.entry(trade_id).write(trade);
 
             self.emit(TradeDelivered { trade_id });
 
@@ -461,17 +462,17 @@ mod PaySlab {
             status: InspectionStatus
         ) {
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
-            assert(self.authorized_inspectors.read(caller) == 1_u8, Errors::UNAUTHORIZED_ACCESS);
+            assert(self.authorized_inspectors.entry(caller).read() == 1_u8, Errors::UNAUTHORIZED_ACCESS);
             assert(trade.quality_inspection_required, Errors::INVALID_MILESTONE);
 
             trade = Trade { inspection_status: status, inspector: caller, ..trade };
 
-            self.trades.write(trade_id, trade.clone());
+            self.trades.entry(trade_id).write(trade);
 
-            self.emit(QualityInspectionCompleted { trade_id, status, inspector: caller });
+            self.emit(QualityInspectionCompleted { trade_id, status: status, inspector: caller });
 
             // If delivered and inspection passed, release final payment
             let delivered = match trade.status { TradeStatus::Delivered => true, _ => false };
@@ -483,7 +484,7 @@ mod PaySlab {
 
         fn dispute_trade(ref self: ContractState, trade_id: u256, reason: ByteArray) {
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
             assert(
@@ -497,14 +498,14 @@ mod PaySlab {
             }
 
             trade = Trade { status: TradeStatus::Disputed, ..trade };
-            self.trades.write(trade_id, trade);
+            self.trades.entry(trade_id).write(trade);
 
             self.emit(TradeDisputed { trade_id, reason });
         }
 
         fn cancel_trade(ref self: ContractState, trade_id: u256) {
             let caller = get_caller_address();
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
 
             assert(trade.id != u256{ low: 0, high: 0 }, Errors::TRADE_NOT_FOUND);
             assert(
@@ -517,9 +518,11 @@ mod PaySlab {
                 _ => { core::panic_with_felt252(Errors::INVALID_TRADE_STATUS); }
             }
 
-            let was_funded = match trade.status { TradeStatus::Funded => true, _ => false };
+            // let trade_status = trade.status;
+
+            let was_funded = match trade.status.clone() { TradeStatus::Funded => true, _ => false };
             trade = Trade { status: TradeStatus::Cancelled, ..trade };
-            self.trades.write(trade_id, trade.clone());
+            self.trades.entry(trade_id).write(trade);
 
             // Refund buyer if trade was funded
             if was_funded {
@@ -533,12 +536,12 @@ mod PaySlab {
 
         fn add_inspector(ref self: ContractState, inspector: ContractAddress) {
             self._only_owner();
-            self.authorized_inspectors.write(inspector, 1_u8);
+            self.authorized_inspectors.entry(inspector).write(1_u8);
         }
 
         fn remove_inspector(ref self: ContractState, inspector: ContractAddress) {
             self._only_owner();
-            self.authorized_inspectors.write(inspector, 0_u8);
+            self.authorized_inspectors.entry(inspector).write(0_u8);
         }
 
         fn update_platform_fee(ref self: ContractState, new_fee_rate: u256) {
@@ -554,19 +557,19 @@ mod PaySlab {
 
         // View functions
         fn get_trade(self: @ContractState, trade_id: u256) -> Trade {
-            self.trades.read(trade_id)
+            self.trades.entry(trade_id).read()
         }
 
         fn get_user_profile(self: @ContractState, user: ContractAddress) -> UserProfile {
-            self.user_profiles.read(user)
+            self.user_profiles.entry(user).read()
         }
 
         fn get_user_reputation_score(self: @ContractState, user: ContractAddress) -> u256 {
-            self.user_profiles.read(user).reputation_score
+            self.user_profiles.entry(user).read().reputation_score
         }
 
         fn is_user_verified(self: @ContractState, user: ContractAddress) -> bool {
-            self.user_profiles.read(user).is_verified
+            self.user_profiles.entry(user).read().is_verified
         }
 
         fn get_usdc_address(self: @ContractState) -> ContractAddress {
@@ -601,7 +604,7 @@ mod PaySlab {
         }
 
         fn _release_final_payment(ref self: ContractState, trade_id: u256) {
-            let mut trade = self.trades.read(trade_id);
+            let mut trade = self.trades.entry(trade_id).read();
             trade = Trade { status: TradeStatus::Completed, ..trade };
 
             let delivery_amount = trade.delivery_amount;
@@ -615,11 +618,11 @@ mod PaySlab {
             // Update reputation scores
             self._update_reputation_scores(trade.buyer, trade.seller, true);
 
-            self.trades.write(trade_id, trade);
+            self.trades.entry(trade_id).write(trade);
 
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller, 
+                recipient: trade.seller.clone(), 
                 amount: seller_amount, 
                 milestone: "DELIVERY" 
             });
@@ -632,8 +635,8 @@ mod PaySlab {
             seller: ContractAddress, 
             success: bool
         ) {
-            let mut buyer_profile = self.user_profiles.read(buyer);
-            let mut seller_profile = self.user_profiles.read(seller);
+            let mut buyer_profile = self.user_profiles.entry(buyer).read();
+            let mut seller_profile = self.user_profiles.entry(seller).read();
 
             if success {
                 buyer_profile = UserProfile { 
@@ -677,8 +680,8 @@ mod PaySlab {
                 }
             }
 
-            self.user_profiles.write(buyer, buyer_profile);
-            self.user_profiles.write(seller, seller_profile);
+            self.user_profiles.entry(buyer).write(buyer_profile);
+            self.user_profiles.entry(seller).write(seller_profile);
         }
     }
 }
