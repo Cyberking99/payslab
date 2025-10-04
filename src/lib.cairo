@@ -32,7 +32,7 @@ enum InspectionStatus {
     NotRequired,
 }
 
-#[derive(Drop, Copy, Serde, starknet::Store)]
+#[derive(Drop, Serde, starknet::Store)]
 struct Trade {
     id: u256,
     buyer: ContractAddress,
@@ -381,12 +381,14 @@ mod PaySlab {
             };
             self.user_profiles.entry(trade.seller).write(seller_profile);
 
+            let total_amount = trade.total_amount;
+            let seller = trade.seller;
             self.trades.entry(trade_id).write(trade);
 
-            self.emit(TradeFunded { trade_id, amount: trade.total_amount.clone() });
+            self.emit(TradeFunded { trade_id, amount: total_amount });
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller,
+                recipient: seller,
                 amount: payment, 
                 milestone: "DEPOSIT" 
             });
@@ -405,23 +407,24 @@ mod PaySlab {
                 _ => { core::panic_with_felt252(Errors::INVALID_TRADE_STATUS); }
             }
 
-            trade = Trade { status: TradeStatus::Shipped, tracking_number: tracking_number.clone(), ..trade };
-
+            let seller = trade.seller;
+            let tracking_number_clone = tracking_number.clone();
+            trade = Trade { status: TradeStatus::Shipped, tracking_number: tracking_number, ..trade };
             // Calculate and release 30% shipment payment
             let shipment_amount = trade.shipment_amount;
             let fee = (shipment_amount * self.platform_fee_rate.read()) / u256{ low: 10000, high: 0 };
             let payment = shipment_amount - fee;
 
             let usdc = IERC20Dispatcher { contract_address: self.usdc.read() };
-            assert(usdc.transfer(trade.seller, payment), Errors::TRANSFER_FAILED);
+            assert(usdc.transfer(seller, payment), Errors::TRANSFER_FAILED);
             assert(usdc.transfer(self.fee_collector.read(), fee), Errors::TRANSFER_FAILED);
 
             self.trades.entry(trade_id).write(trade);
 
-            self.emit(TradeShipped { trade_id, tracking_number });
+            self.emit(TradeShipped { trade_id, tracking_number: tracking_number_clone });
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller.clone(), 
+                recipient: seller, 
                 amount: payment, 
                 milestone: "SHIPMENT" 
             });
@@ -441,14 +444,16 @@ mod PaySlab {
                 _ => { core::panic_with_felt252(Errors::INVALID_TRADE_STATUS); }
             }
 
+            let trade_inspection_status = trade.inspection_status;
+            let quality_inspection_required = trade.quality_inspection_required;
             trade = Trade { status: TradeStatus::Delivered, ..trade };
             self.trades.entry(trade_id).write(trade);
 
             self.emit(TradeDelivered { trade_id });
 
             // If quality inspection required, wait for inspection
-            let is_pending = match trade.inspection_status { InspectionStatus::Pending => true, _ => false };
-            if trade.quality_inspection_required && is_pending {
+            let is_pending = match trade_inspection_status { InspectionStatus::Pending => true, _ => false };
+            if quality_inspection_required && is_pending {
                 return;
             }
 
@@ -468,6 +473,7 @@ mod PaySlab {
             assert(self.authorized_inspectors.entry(caller).read() == 1_u8, Errors::UNAUTHORIZED_ACCESS);
             assert(trade.quality_inspection_required, Errors::INVALID_MILESTONE);
 
+            let current_status = trade.status;
             trade = Trade { inspection_status: status, inspector: caller, ..trade };
 
             self.trades.entry(trade_id).write(trade);
@@ -475,7 +481,7 @@ mod PaySlab {
             self.emit(QualityInspectionCompleted { trade_id, status: status, inspector: caller });
 
             // If delivered and inspection passed, release final payment
-            let delivered = match trade.status { TradeStatus::Delivered => true, _ => false };
+            let delivered = match current_status { TradeStatus::Delivered => true, _ => false };
             let passed = match status { InspectionStatus::Passed => true, _ => false };
             if delivered && passed {
                 self._release_final_payment(trade_id);
@@ -518,18 +524,20 @@ mod PaySlab {
                 _ => { core::panic_with_felt252(Errors::INVALID_TRADE_STATUS); }
             }
 
-            // let trade_status = trade.status;
+            let trade_status = trade.status.clone();
 
-            let was_funded = match trade.status.clone() { TradeStatus::Funded => true, _ => false };
-            trade = Trade { status: TradeStatus::Cancelled, ..trade };
-            self.trades.entry(trade_id).write(trade);
-
+            let was_funded = match trade_status { TradeStatus::Funded => true, _ => false };
+            
             // Refund buyer if trade was funded
             if was_funded {
                 let refund_amount = trade.total_amount - trade.deposit_amount;
+                let buyer = trade.buyer;
                 let usdc = IERC20Dispatcher { contract_address: self.usdc.read() };
-                assert(usdc.transfer(trade.buyer, refund_amount), Errors::TRANSFER_FAILED);
+                assert(usdc.transfer(buyer, refund_amount), Errors::TRANSFER_FAILED);
             }
+            
+            trade = Trade { status: TradeStatus::Cancelled, ..trade };
+            self.trades.entry(trade_id).write(trade);
 
             self.emit(TradeCancelled { trade_id });
         }
@@ -605,6 +613,7 @@ mod PaySlab {
 
         fn _release_final_payment(ref self: ContractState, trade_id: u256) {
             let mut trade = self.trades.entry(trade_id).read();
+            let seller = trade.seller;
             trade = Trade { status: TradeStatus::Completed, ..trade };
 
             let delivery_amount = trade.delivery_amount;
@@ -622,7 +631,7 @@ mod PaySlab {
 
             self.emit(PaymentReleased { 
                 trade_id, 
-                recipient: trade.seller.clone(), 
+                recipient: seller, 
                 amount: seller_amount, 
                 milestone: "DELIVERY" 
             });
