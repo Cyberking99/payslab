@@ -1,0 +1,754 @@
+[
+  {
+    "name": "PaySlabImpl",
+    "type": "impl",
+    "interface_name": "payslab::IPaySlab"
+  },
+  {
+    "name": "core::integer::u256",
+    "type": "struct",
+    "members": [
+      {
+        "name": "low",
+        "type": "core::integer::u128"
+      },
+      {
+        "name": "high",
+        "type": "core::integer::u128"
+      }
+    ]
+  },
+  {
+    "name": "core::byte_array::ByteArray",
+    "type": "struct",
+    "members": [
+      {
+        "name": "data",
+        "type": "core::array::Array::<core::bytes_31::bytes31>"
+      },
+      {
+        "name": "pending_word",
+        "type": "core::felt252"
+      },
+      {
+        "name": "pending_word_len",
+        "type": "core::integer::u32"
+      }
+    ]
+  },
+  {
+    "name": "core::bool",
+    "type": "enum",
+    "variants": [
+      {
+        "name": "False",
+        "type": "()"
+      },
+      {
+        "name": "True",
+        "type": "()"
+      }
+    ]
+  },
+  {
+    "name": "payslab::InspectionStatus",
+    "type": "enum",
+    "variants": [
+      {
+        "name": "Pending",
+        "type": "()"
+      },
+      {
+        "name": "Passed",
+        "type": "()"
+      },
+      {
+        "name": "Failed",
+        "type": "()"
+      },
+      {
+        "name": "NotRequired",
+        "type": "()"
+      }
+    ]
+  },
+  {
+    "name": "payslab::TradeStatus",
+    "type": "enum",
+    "variants": [
+      {
+        "name": "Created",
+        "type": "()"
+      },
+      {
+        "name": "Funded",
+        "type": "()"
+      },
+      {
+        "name": "Shipped",
+        "type": "()"
+      },
+      {
+        "name": "Delivered",
+        "type": "()"
+      },
+      {
+        "name": "Completed",
+        "type": "()"
+      },
+      {
+        "name": "Disputed",
+        "type": "()"
+      },
+      {
+        "name": "Cancelled",
+        "type": "()"
+      }
+    ]
+  },
+  {
+    "name": "payslab::Trade",
+    "type": "struct",
+    "members": [
+      {
+        "name": "id",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "buyer",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "seller",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "total_amount",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "deposit_amount",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "shipment_amount",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "delivery_amount",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "status",
+        "type": "payslab::TradeStatus"
+      },
+      {
+        "name": "inspection_status",
+        "type": "payslab::InspectionStatus"
+      },
+      {
+        "name": "tracking_number",
+        "type": "core::byte_array::ByteArray"
+      },
+      {
+        "name": "quality_standards",
+        "type": "core::byte_array::ByteArray"
+      },
+      {
+        "name": "created_at",
+        "type": "core::integer::u64"
+      },
+      {
+        "name": "delivery_deadline",
+        "type": "core::integer::u64"
+      },
+      {
+        "name": "quality_inspection_required",
+        "type": "core::bool"
+      },
+      {
+        "name": "inspector",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "name": "payslab::UserProfile",
+    "type": "struct",
+    "members": [
+      {
+        "name": "bvn",
+        "type": "core::felt252"
+      },
+      {
+        "name": "is_verified",
+        "type": "core::bool"
+      },
+      {
+        "name": "total_trades",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "successful_trades",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "reputation_score",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "joined_at",
+        "type": "core::integer::u64"
+      }
+    ]
+  },
+  {
+    "name": "payslab::IPaySlab",
+    "type": "interface",
+    "items": [
+      {
+        "name": "verify_user",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "bvn",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "create_trade",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "seller",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "total_amount",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "delivery_deadline",
+            "type": "core::integer::u64"
+          },
+          {
+            "name": "quality_standards",
+            "type": "core::byte_array::ByteArray"
+          },
+          {
+            "name": "quality_inspection_required",
+            "type": "core::bool"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u256"
+          }
+        ],
+        "state_mutability": "external"
+      },
+      {
+        "name": "fund_trade",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "mark_shipped",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "tracking_number",
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "confirm_delivery",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "complete_quality_inspection",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "status",
+            "type": "payslab::InspectionStatus"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "dispute_trade",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "reason",
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "cancel_trade",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "add_inspector",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "inspector",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "remove_inspector",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "inspector",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "update_platform_fee",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "new_fee_rate",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "update_fee_collector",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "new_collector",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "name": "get_trade",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "trade_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "payslab::Trade"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_user_profile",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "payslab::UserProfile"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_user_reputation_score",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u256"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "is_user_verified",
+        "type": "function",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_usdc_address",
+        "type": "function",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_platform_fee_rate",
+        "type": "function",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::integer::u256"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_fee_collector",
+        "type": "function",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "name": "get_owner",
+        "type": "function",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "state_mutability": "view"
+      }
+    ]
+  },
+  {
+    "name": "constructor",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "usdc",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "platform_fee_rate",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "fee_collector",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "owner",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeCreated",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "key",
+        "name": "buyer",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "kind": "key",
+        "name": "seller",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "kind": "data",
+        "name": "amount",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeFunded",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "data",
+        "name": "amount",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeShipped",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "data",
+        "name": "tracking_number",
+        "type": "core::byte_array::ByteArray"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeDelivered",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeCompleted",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeDisputed",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "data",
+        "name": "reason",
+        "type": "core::byte_array::ByteArray"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::TradeCancelled",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::PaymentReleased",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "key",
+        "name": "recipient",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "kind": "data",
+        "name": "amount",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "data",
+        "name": "milestone",
+        "type": "core::byte_array::ByteArray"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::UserVerified",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "user",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "kind": "data",
+        "name": "bvn",
+        "type": "core::felt252"
+      }
+    ]
+  },
+  {
+    "kind": "struct",
+    "name": "payslab::PaySlab::QualityInspectionCompleted",
+    "type": "event",
+    "members": [
+      {
+        "kind": "key",
+        "name": "trade_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "kind": "data",
+        "name": "status",
+        "type": "payslab::InspectionStatus"
+      },
+      {
+        "kind": "data",
+        "name": "inspector",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "kind": "enum",
+    "name": "payslab::PaySlab::Event",
+    "type": "event",
+    "variants": [
+      {
+        "kind": "nested",
+        "name": "TradeCreated",
+        "type": "payslab::PaySlab::TradeCreated"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeFunded",
+        "type": "payslab::PaySlab::TradeFunded"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeShipped",
+        "type": "payslab::PaySlab::TradeShipped"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeDelivered",
+        "type": "payslab::PaySlab::TradeDelivered"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeCompleted",
+        "type": "payslab::PaySlab::TradeCompleted"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeDisputed",
+        "type": "payslab::PaySlab::TradeDisputed"
+      },
+      {
+        "kind": "nested",
+        "name": "TradeCancelled",
+        "type": "payslab::PaySlab::TradeCancelled"
+      },
+      {
+        "kind": "nested",
+        "name": "PaymentReleased",
+        "type": "payslab::PaySlab::PaymentReleased"
+      },
+      {
+        "kind": "nested",
+        "name": "UserVerified",
+        "type": "payslab::PaySlab::UserVerified"
+      },
+      {
+        "kind": "nested",
+        "name": "QualityInspectionCompleted",
+        "type": "payslab::PaySlab::QualityInspectionCompleted"
+      }
+    ]
+  }
+]
